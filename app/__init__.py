@@ -1,11 +1,9 @@
 from flask import Flask
-from config import Config # Import the Config class
+from config import Config
+from flask_cors import CORS # Add this import
 
-# Create Flask app instance
 app = Flask(__name__)
-
-# Apply the configuration from the Config object
 app.config.from_object(Config)
+CORS(app) # Add this line to enable CORS
 
-# Import routes after app and config are set up
 from app import routes
