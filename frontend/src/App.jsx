@@ -1,5 +1,24 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ResultCard from './ResultCard';
+
+// ---------- Branding (title + favicon) ----------
+const APP_TITLE = 'AI Car Deal Grader by GEMINI';
+
+// Inline SVG favicon; change "AG" to whatever you want
+const FAVICON_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <text x="50%" y="52%" font-size="28" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-weight="700" text-anchor="middle" fill="white">AG</text>
+</svg>`.trim();
+
+const FAVICON_HREF = 'data:image/svg+xml;utf8,' + encodeURIComponent(FAVICON_SVG);
+// ------------------------------------------------
 
 function App() {
   const [url, setUrl] = useState('');
@@ -9,107 +28,97 @@ function App() {
   const [error, setError] = useState(null);
   const imageInputRef = useRef(null);
 
+  // Apply title + favicon (runs on load and when result changes)
+  useEffect(() => {
+    const titleFromResult = () => {
+      const g = result?.gptData || {};
+      const maker = g.maker || g.make || '';
+      const model = g.model || '';
+      const year = g.year || '';
+      const head = [year, maker, model].filter(Boolean).join(' ');
+      return head ? `${head} | ${APP_TITLE}` : APP_TITLE;
+    };
+    document.title = titleFromResult();
+
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/svg+xml';
+    link.href = FAVICON_HREF;
+  }, [result]);
+
   // Handler for URL input changes
   const handleUrlChange = (event) => {
     setUrl(event.target.value);
-    // Clear image state if user starts typing a URL
     if (image) {
       setImage(null);
-      if (imageInputRef.current) {
-        // Corrected the typo here
-        imageInputRef.current.value = null; // Reset the file input visually
-      }
+      if (imageInputRef.current) imageInputRef.current.value = null;
     }
   };
 
   // Handler for image file selection
   const handleImageChange = (event) => {
-    setUrl(''); // Clear URL if user uploads an image
+    setUrl('');
     const file = event.target.files?.[0];
     if (file) setImage(file);
   };
 
-  // Handler for drag-and-drop image functionality
+  // Drag & drop
   const handleImageDrop = (event) => {
     event.preventDefault();
-    setUrl(''); // Clear URL
+    setUrl('');
     const file = event.dataTransfer.files?.[0];
     if (file) {
       setImage(file);
-      // Synchronize the dropped file with the hidden file input
-      if (imageInputRef.current) {
-        imageInputRef.current.files = event.dataTransfer.files;
-      }
+      if (imageInputRef.current) imageInputRef.current.files = event.dataTransfer.files;
     }
   };
-
-  // Prevent default behavior when dragging over the drop zone
   const handleDragOver = (event) => event.preventDefault();
 
-  // Main function to handle the API call
+  // Call backend
   const handleEvaluate = async () => {
     setIsLoading(true);
     setResult(null);
     setError(null);
-
     try {
       let response;
-      // Case 1: User provided a URL
       if (url) {
-        // Use the relative path to leverage the Vite proxy
         response = await fetch('/api/evaluate', {
           method: 'POST',
-          headers: {
-            // Set the correct Content-Type for JSON data
-            'Content-Type': 'application/json',
-          },
-          // Send the URL in a JSON object
-          body: JSON.stringify({ url: url }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
         });
-      } 
-      // Case 2: User provided an image
-      else if (image) {
+      } else if (image) {
         const formData = new FormData();
         formData.append('image', image);
-
-        // IMPORTANT: This requires a separate backend endpoint that can handle image uploads.
-        // The browser sets the 'Content-Type' for FormData automatically.
-        response = await fetch('/api/evaluate_image', {
-          method: 'POST',
-          body: formData,
-        });
-      } 
-      // Case 3: No input provided
-      else {
-        throw new Error("Please provide a URL or an image.");
+        response = await fetch('/api/evaluate_image', { method: 'POST', body: formData });
+      } else {
+        throw new Error('Please provide a URL or an image.');
       }
 
       const data = await response.json();
-
-      // Check if the server responded with an error status
-      if (!response.ok) {
-        throw new Error(data.error || `Request failed with status ${response.status}`);
-      }
+      if (!response.ok) throw new Error(data.error || `Request failed with status ${response.status}`);
       setResult(data);
     } catch (err) {
-      // Ensure the error message is always a string
       setError(err.message || 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Trigger the hidden file input when the upload button is clicked
   const handleImageUploadClick = () => imageInputRef.current?.click();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#ffd7dc] via-[#ffe6c6] to-[#cfe5ff] flex items-center justify-center px-4 font-sans">
       <div className="w-full max-w-4xl text-center">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 drop-shadow-sm">
-         AI Car Deal Grader
+          AI Car Deal Grader by GEMINI
         </h1>
         <p className="mt-4 text-gray-700/80">
-        Evaluate car listings using an LLM + Vehicle Pricing API. Enter a Craigslist URL or upload an image.
+          Evaluate car listings using an LLM + Vehicle Pricing API. Enter a Craigslist URL or upload an image.
         </p>
 
         <section className="mt-10 rounded-3xl bg-white/70 backdrop-blur-md shadow-lg ring-1 ring-black/5 p-5 md:p-7">
@@ -162,15 +171,20 @@ function App() {
             </button>
           </div>
 
-          {error && <div className="mt-4 text-sm font-medium text-red-600 bg-red-100/50 border border-red-200 rounded-lg p-2">{error}</div>}
+          {error && (
+            <div className="mt-4 text-sm font-medium text-red-600 bg-red-100/50 border border-red-200 rounded-lg p-2">
+              {error}
+            </div>
+          )}
         </section>
 
         {isLoading && (
-            <div className="mt-8 flex justify-center items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                <p className="ml-3 text-gray-600">Analyzing, please wait...</p>
-            </div>
+          <div className="mt-8 flex justify-center items-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            <p className="ml-3 text-gray-600">Analyzing, please wait...</p>
+          </div>
         )}
+
         {result && (
           <div className="mt-8 text-left">
             <ResultCard result={result} />
