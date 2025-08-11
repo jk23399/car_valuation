@@ -1,6 +1,6 @@
-flask
-openai
-python-dotenv
-requestsflask-cors
-google-generativeai
-gunicorn
+Flask>=3.0,<4
+flask-cors>=4.0,<5
+requests>=2.31,<3
+python-dotenv>=1.0,<2
+google-generativeai>=0.7,<1
+gunicorn>=21,<22
