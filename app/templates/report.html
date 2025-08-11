@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Deal Evaluation Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #333; background-color: #f0f2f5;}
+        .container { max-width: 700px; margin: 20px auto; }
+        .report-card { border: 1px solid #e1e4e8; padding: 20px; border-radius: 8px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        h1, h2 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+        .rating { font-size: 2.2em; font-weight: bold; text-align: center; margin-bottom: 10px; }
+        .comment { text-align: center; font-size: 1.1em; color: #586069; margin-bottom: 20px;}
+        .Excellent_Deal { color: #28a745; }
+        .Good_Deal { color: #17a2b8; }
+        .Fair_Price { color: #ffc107; }
+        .Overpriced { color: #dc3545; }
+        pre { background-color: #f6f8fa; border: 1px solid #e1e4e8; padding: 16px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; }
+        .price-comparison { display: flex; justify-content: space-around; text-align: center; margin: 20px 0; }
+        .price-box h3 { margin: 0 0 5px 0; font-size: 1em; color: #586069; }
+        .price-box .price-value { font-size: 1.8em; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Deal Evaluation Report</h1>
+        <div class="report-card">
+            <div class="rating {{ deal_rating_data.get('rating').replace(' ', '_') }}">{{ deal_rating_data.get('rating') }}</div>
+            <p class="comment">{{ deal_rating_data.get('comment') }}</p>
+            <div class="price-comparison">
+                <div class="price-box">
+                    <h3>Listing Price</h3>
+                    <div class="price-value">
+                        {% if gpt_data.get('price') and gpt_data.get('price') > 0 %}
+                            ${{ "{:,.0f}".format(gpt_data.get('price')) }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="price-box">
+                    <h3>Market Value</h3>
+                    <div class="price-value">
+                        {% if valuation_data.get('valuation_price') and valuation_data.get('valuation_price') > 0 %}
+                            ${{ "{:,.0f}".format(valuation_data.get('valuation_price')) }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <hr>
+            <h3>Details</h3>
+            <pre>Source: {{ valuation_data.get('source', 'N/A') }}
+GPT Data: {{ gpt_data | tojson(indent=2) }}
+API Response: {{ valuation_data.get('raw_api_response', {}) | tojson(indent=2) }}</pre>
+        </div>
+    </div>
+</body>
+</html>

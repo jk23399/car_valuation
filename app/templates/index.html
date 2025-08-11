@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Valuation Project</title>
+</head>
+<body>
+    <h1>Car Deal Grader</h1>
+    <p>Enter the URL of a car listing to evaluate the deal.</p>
+
+    <form action="/evaluate" method="POST">
+        <label for="url_input">Car Listing URL:</label>
+        <input type="url" id="url_input" name="url" placeholder="https://www.example.com/car_listing..." size="50" required>
+        <button type="submit">Evaluate</button>
+    </form>
+
+</body>
+</html>
