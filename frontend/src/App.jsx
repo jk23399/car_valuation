@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import ResultCard from './ResultCard';
 
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/+$/, '');
+
 // ---------- Branding (title + favicon) ----------
 const APP_TITLE = 'AI Car Deal Grader by GEMINI';
 
@@ -85,16 +87,24 @@ function App() {
     setError(null);
     try {
       let response;
+
       if (url) {
-        response = await fetch('/api/evaluate', {
+        // POST /api/evaluate (absolute if API_BASE is set)
+        const endpoint = `${API_BASE}/api/evaluate`.replace(/^\/\//, '/');
+        response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url }),
         });
       } else if (image) {
+        // POST /api/evaluate_image
         const formData = new FormData();
         formData.append('image', image);
-        response = await fetch('/api/evaluate_image', { method: 'POST', body: formData });
+        const endpoint = `${API_BASE}/api/evaluate_image`.replace(/^\/\//, '/');
+        response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+        });
       } else {
         throw new Error('Please provide a URL or an image.');
       }
