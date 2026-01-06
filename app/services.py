@@ -5,7 +5,7 @@ import os
 import requests
 import google.generativeai as genai
 
-# 캐싱 관련 함수들은 있지만, 아래에서 사용하지 않으므로 의미 없음
+# Cache functions exist but are unused below.
 CACHE_FILE = 'api_cache.json'
 def load_cache():
     if os.path.exists(CACHE_FILE):
@@ -29,7 +29,8 @@ def get_vehicle_info_from_url(url: str) -> tuple[str, dict]:
         5. Construct a single, valid JSON object with the keys "maker", "model", "year", and "price". Do not include any other text or keys in your response.
         Example JSON Response: {{ "maker": "Lexus", "model": "ES 350", "year": "2007", "price": 4800 }}
         """
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        # Fixed: Updated model name to avoid 404 error
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
         response = model.generate_content(prompt)
         raw_response_string = response.text.strip().replace("```json", "").replace("```", "").strip()
         vehicle_data = json.loads(raw_response_string)
@@ -63,7 +64,7 @@ def call_real_vehicle_api(vehicle_data: dict) -> dict:
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
 
-# --- Smart Valuation Function (캐싱 로직 완전 제거) ---
+# --- Smart Valuation Function (Caching Logic Completely Removed) ---
 def get_valuation(vehicle_data: dict) -> dict:
     """
     This function now ALWAYS makes a live API call, bypassing all cache logic.
@@ -71,17 +72,17 @@ def get_valuation(vehicle_data: dict) -> dict:
     print("--- CACHING IS COMPLETELY DISABLED ---")
     print("--- Forcing a new, live API call to get the real market price. ---")
     
-    # Mock 모드는 그대로 유지
+    # Keep Mock mode as is
     if current_app.config.get('API_MODE', 'mock') == 'mock':
         price = vehicle_data.get("price", 0)
         return {"valuation_price": int(price * 1.08) if isinstance(price, (int, float)) else 0, "source": "Mock Data"}
 
-    # 필수 정보 확인
+    # Check required info
     maker, model, year = vehicle_data.get('maker'), vehicle_data.get('model'), str(vehicle_data.get('year'))
     if not all([maker, model, year]): 
         return {"error": "Maker, model, and year are required for a real valuation."}
 
-    # 캐시를 무시하고 무조건 실제 API 호출
+    # Ignore cache and force real API call
     return call_real_vehicle_api(vehicle_data)
 
 def calculate_deal_rating(listing_price: int, valuation_price: int) -> dict:
