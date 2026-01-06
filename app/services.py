@@ -1,11 +1,10 @@
-import openai
 import json
 from flask import current_app
 import os
 import requests
 import google.generativeai as genai
+from bs4 import BeautifulSoup
 
-# 캐싱 관련 함수들은 있지만, 아래에서 사용하지 않으므로 의미 없음
 CACHE_FILE = 'api_cache.json'
 def load_cache():
     if os.path.exists(CACHE_FILE):
@@ -16,26 +15,47 @@ def save_cache(cache_data):
 
 def get_vehicle_info_from_url(url: str) -> tuple[str, dict]:
     try:
+        response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        for script in soup(["script", "style", "nav", "footer"]):
+            script.decompose()
+        
+        page_text = soup.get_text(separator=' ', strip=True)[:8000]
+        
         api_key = current_app.config.get('GOOGLE_API_KEY')
         if not api_key:
             return "Configuration Error", {"error": "Google AI API key is not configured."}
+        
         genai.configure(api_key=api_key)
+        
         prompt = f"""
-        Analyze the car listing from the URL below. Follow these steps precisely. URL: {url}
-        1. First, examine the page title and the main H1 heading for the listing. The price is often located here.
-        2. Second, scan the main body content for any listed price, especially near keywords like "price", "ask", or the '$' symbol.
-        3. Determine the listing price. It's the most prominent dollar amount. Remove any '$' or ',' characters and provide it as an integer. If you absolutely cannot find a price after checking both title and body, use 0.
-        4. Determine the vehicle's "maker", "model", and "year". The year must be a 4-digit string.
-        5. Construct a single, valid JSON object with the keys "maker", "model", "year", and "price". Do not include any other text or keys in your response.
-        Example JSON Response: {{ "maker": "Lexus", "model": "ES 350", "year": "2007", "price": 4800 }}
+        Extract vehicle information from this Craigslist listing:
+        
+        {page_text}
+        
+        Extract:
+        1. maker (brand)
+        2. model
+        3. year (4-digit string)
+        4. price (integer, remove $ and commas, use 0 if not found)
+        
+        Return ONLY valid JSON: {{"maker": "...", "model": "...", "year": "...", "price": ...}}
         """
+        
         model = genai.GenerativeModel('gemini-1.5-pro')
-        response = model.generate_content(prompt)
-        raw_response_string = response.text.strip().replace("```json", "").replace("```", "").strip()
+        gemini_response = model.generate_content(prompt)
+        
+        raw_response_string = gemini_response.text.strip().replace("```json", "").replace("```", "").strip()
         vehicle_data = json.loads(raw_response_string)
+        
         return raw_response_string, vehicle_data
+        
+    except requests.exceptions.RequestException as e:
+        return str(e), {"error": f"Failed to fetch webpage: {str(e)}"}
     except Exception as e:
-        return str(e), {"error": f"An unexpected error occurred during Gemini API call: {str(e)}"}
+        return str(e), {"error": f"Error: {str(e)}"}
     
 def call_real_vehicle_api(vehicle_data: dict) -> dict:
     API_ENDPOINT = "https://vehicle-pricing-api.p.rapidapi.com/get%2Bvehicle%2Bvalue"
@@ -63,25 +83,15 @@ def call_real_vehicle_api(vehicle_data: dict) -> dict:
     except Exception as e:
         return {"error": f"An unexpected error occurred: {e}"}
 
-# --- Smart Valuation Function (캐싱 로직 완전 제거) ---
 def get_valuation(vehicle_data: dict) -> dict:
-    """
-    This function now ALWAYS makes a live API call, bypassing all cache logic.
-    """
-    print("--- CACHING IS COMPLETELY DISABLED ---")
-    print("--- Forcing a new, live API call to get the real market price. ---")
-    
-    # Mock 모드는 그대로 유지
     if current_app.config.get('API_MODE', 'mock') == 'mock':
         price = vehicle_data.get("price", 0)
         return {"valuation_price": int(price * 1.08) if isinstance(price, (int, float)) else 0, "source": "Mock Data"}
 
-    # 필수 정보 확인
     maker, model, year = vehicle_data.get('maker'), vehicle_data.get('model'), str(vehicle_data.get('year'))
     if not all([maker, model, year]): 
         return {"error": "Maker, model, and year are required for a real valuation."}
 
-    # 캐시를 무시하고 무조건 실제 API 호출
     return call_real_vehicle_api(vehicle_data)
 
 def calculate_deal_rating(listing_price: int, valuation_price: int) -> dict:
