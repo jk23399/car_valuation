@@ -1,4 +1,6 @@
 flask
 openai
 python-dotenv
-requestsflask-cors
+requests
+flask-cors
+google-generativeai
